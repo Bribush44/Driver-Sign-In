@@ -926,21 +926,15 @@ header{background:#292929;border-bottom:3px solid var(--red);padding:13px 20px;
     <ol class="step-list">
       <li>Go to <strong>sheets.google.com</strong> and create a new blank spreadsheet.</li>
       <li>Click <strong>Extensions &rarr; Apps Script</strong>.</li>
-      <li>Delete existing code and paste the script below. Click <strong>Save</strong>.</li>
-      <li><strong style="color:#dc2626">IMPORTANT &mdash; Authorize Drive access first:</strong> At the top of the editor, change the function dropdown to <strong>authorizeNow</strong>, then click the <strong>&#9654; Run</strong> button. A popup will ask for Google permissions &mdash; click <strong>Allow</strong>. You only do this once.</li>
-      <li>Now click <strong>Deploy &rarr; New deployment</strong>.</li>
+      <li>Delete all existing code and paste the script below. Click <strong>Save</strong>.</li>
+      <li>Click <strong>Deploy &rarr; New deployment</strong>.</li>
       <li>Type: <strong>Web app</strong> &bull; Execute as: <strong>Me</strong> &bull; Access: <strong>Anyone</strong>. Click <strong>Deploy</strong>.</li>
+      <li>Authorize the script when prompted (no special permissions needed).</li>
       <li>Copy the <strong>Web app URL</strong> and paste it above.</li>
     </ol>
     <div class="info-box">&#128274; &ldquo;Anyone&rdquo; only means the tablet can post data &mdash; the spreadsheet stays private to you.</div>
     <p style="font-size:12px;font-weight:700;color:#374151;margin-bottom:9px">Paste into Apps Script editor:</p>
-    <div class="code-block">// Run this ONCE from the editor (▶ button) to grant Drive permission
-function authorizeNow() {
-  DriveApp.getRootFolder();
-  SpreadsheetApp.getActiveSpreadsheet();
-}
-
-function doPost(e) {
+    <div class="code-block">function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
@@ -950,22 +944,18 @@ function doPost(e) {
         'Trailer Temp Photo','License / Employee #','License State','Signature']);
       sheet.getRange(1,1,1,12).setFontWeight('bold');
     }
-    // Add the data row first (signature cell left empty, filled below)
+    // Add the data row (signature column empty for now)
     sheet.appendRow([data.timestamp,data.driverName,data.carrier,data.sealMatch,
       data.sealNumber,data.poNumber||'',data.bolPhoto||'',data.tempControlled||'',
       data.trailerTempPhoto||'',data.licenseNumber,data.licenseState,'']);
     var newRow = sheet.getLastRow();
-    // Upload signature image to Drive and embed it directly in the cell
+    // Insert signature as an image directly in the sheet (no Drive needed)
     if (data.signature &amp;&amp; data.signature.indexOf('data:image') === 0) {
       try {
         var b64 = data.signature.split(',')[1];
-        var blob = Utilities.newBlob(Utilities.base64Decode(b64), 'image/jpeg',
-          'sig_' + (data.timestamp || Date.now()) + '.jpg');
-        var file = DriveApp.createFile(blob);
-        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        var imgUrl = 'https://drive.google.com/uc?export=view&amp;id=' + file.getId();
-        var cellImg = SpreadsheetApp.newCellImage().setSourceUrl(imgUrl).build();
-        sheet.getRange(newRow, 12).setValue(cellImg);
+        var blob = Utilities.newBlob(Utilities.base64Decode(b64), 'image/jpeg', 'sig.jpg');
+        sheet.setRowHeight(newRow, 80);
+        sheet.insertImage(blob, 12, newRow);
       } catch(sigErr) {
         sheet.getRange(newRow, 12).setValue('[Sig error: ' + sigErr.message + ']');
       }
