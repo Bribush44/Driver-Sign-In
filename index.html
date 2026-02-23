@@ -1310,9 +1310,9 @@ function handleProductTempPhoto(input){
 function clearProductTempPhoto(){
   productTempPhotoData=null;
   var c=document.getElementById('productTempCamera');if(c)c.value='';
-  document.getElementById('productTempPreview').src='';
-  document.getElementById('productTempPreviewWrap').style.display='none';
-  document.getElementById('productTempCameraBtn').style.display='';
+  var p=document.getElementById('productTempPreview');if(p)p.src='';
+  var w=document.getElementById('productTempPreviewWrap');if(w)w.style.display='none';
+  var b=document.getElementById('productTempCameraBtn');if(b)b.style.display='';
 }
 
 function handleBolPhoto(input){
