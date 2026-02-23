@@ -850,7 +850,7 @@ header{background:#292929;border-bottom:3px solid var(--red);padding:13px 20px;
     <div class="s-name" id="sName"></div>
     <div class="s-detail" id="sDetail"></div>
     <div class="s-sync" id="sSync"></div>
-    <div class="s-countdown">Returning to welcome screen in <strong id="countNum">60</strong>s&hellip;</div>
+    <div class="s-countdown">Returning to welcome screen in <strong id="countNum">120</strong>s&hellip;</div>
     <div style="margin-top:18px;padding:16px 18px;background:#f0fdf4;border-radius:14px;border:1px solid #bbf7d0">
       <p id="thankYouMsg" style="font-size:17px;font-weight:700;color:#15803d;margin:0 0 6px;font-family:var(--font-h)">Thank you, driver! &#127856;</p>
       <p style="font-size:14px;color:#166534;margin:0">Please be safe out there and have a wonderful day.<br>We appreciate you choosing Tennessee Cheesecake!</p>
@@ -944,9 +944,27 @@ header{background:#292929;border-bottom:3px solid var(--red);padding:13px 20px;
         'Trailer Temp Photo','License / Employee #','License State','Signature']);
       sheet.getRange(1,1,1,12).setFontWeight('bold');
     }
+    // Save signature to hidden Signatures sheet and store a view link
+    var sigValue = '';
+    if (data.signature && data.signature.indexOf('data:image') === 0) {
+      try {
+        var ss = SpreadsheetApp.getActiveSpreadsheet();
+        var sigSheet = ss.getSheetByName('Signatures');
+        if (!sigSheet) {
+          sigSheet = ss.insertSheet('Signatures');
+          sigSheet.hideSheet();
+          sigSheet.appendRow(['Timestamp','Driver','Signature']);
+        }
+        sigSheet.appendRow([data.timestamp, data.driverName||'', data.signature]);
+        var scriptUrl = ScriptApp.getService().getUrl();
+        sigValue = scriptUrl + '?view_sig=' + encodeURIComponent(data.timestamp);
+      } catch(sigErr) {
+        sigValue = '[Signature error: ' + sigErr.message + ']';
+      }
+    }
     sheet.appendRow([data.timestamp,data.driverName,data.carrier,data.sealMatch,
       data.sealNumber,data.poNumber||'',data.bolPhoto||'',data.tempControlled||'',
-      data.trailerTempPhoto||'',data.licenseNumber,data.licenseState,data.signature||'']);
+      data.trailerTempPhoto||'',data.licenseNumber,data.licenseState,sigValue]);
     return ContentService.createTextOutput(JSON.stringify({status:'ok'}))
       .setMimeType(ContentService.MimeType.JSON);
   } catch(err) {
@@ -957,17 +975,39 @@ header{background:#292929;border-bottom:3px solid var(--red);padding:13px 20px;
 
 function doGet(e) {
   try {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    if (e.parameter.verify) {
-      var ts = decodeURIComponent(e.parameter.verify);
-      var data = sheet.getDataRange().getValues();
-      var found = data.some(function(row) { return String(row[0]) === ts; });
-      return ContentService.createTextOutput(JSON.stringify({status:'ok',found:found}))
-        .setMimeType(ContentService.MimeType.JSON);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    // View a signature by timestamp
+    if (e.parameter.view_sig) {
+      var ts = decodeURIComponent(e.parameter.view_sig);
+      var sigSheet = ss.getSheetByName('Signatures');
+      if (sigSheet) {
+        var rows = sigSheet.getDataRange().getValues();
+        for (var i = 1; i &lt; rows.length; i++) {
+          if (String(rows[i][0]) === ts) {
+            var html = '&lt;!DOCTYPE html&gt;&lt;html&gt;&lt;head&gt;&lt;title&gt;Driver Signature&lt;/title&gt;'
+              + '&lt;style&gt;body{margin:0;background:#f1f1e8;display:flex;align-items:center;'
+              + 'justify-content:center;min-height:100vh;font-family:sans-serif;}'
+              + '.box{background:#fff;padding:28px;border-radius:16px;'
+              + 'box-shadow:0 4px 24px rgba(0,0,0,.15);text-align:center;max-width:480px;width:90%;}'
+              + 'h3{margin:0 0 4px;font-size:18px;color:#1a1a1a}'
+              + 'p{color:#6b7280;font-size:13px;margin:0 0 16px}'
+              + 'img{max-width:100%;border:1px solid #e2e2d9;border-radius:8px}'
+              + '&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class="box"&gt;'
+              + '&lt;h3&gt;Driver Signature&lt;/h3&gt;'
+              + '&lt;p&gt;' + (rows[i][1]||'Driver') + ' &amp;mdash; ' + ts + '&lt;/p&gt;'
+              + '&lt;img src="' + rows[i][2] + '"&gt;'
+              + '&lt;/div&gt;&lt;/body&gt;&lt;/html&gt;';
+            return HtmlService.createHtmlOutput(html);
+          }
+        }
+      }
+      return HtmlService.createHtmlOutput('&lt;p&gt;Signature not found.&lt;/p&gt;');
     }
+    // Default: return sheet info
+    var sheet = ss.getActiveSheet();
     return ContentService.createTextOutput(JSON.stringify({
       status:'ok',
-      sheetUrl: SpreadsheetApp.getActiveSpreadsheet().getUrl(),
+      sheetUrl: ss.getUrl(),
       rows: sheet.getLastRow() - 1
     })).setMimeType(ContentService.MimeType.JSON);
   } catch(err) {
@@ -1280,7 +1320,7 @@ function sendToSheet(entry){
   var p=Object.assign({},entry);
   delete p.sealPhoto;delete p.licensePhoto;delete p.trailerTempPhoto;delete p.productTempPhoto;
   if(p.bolPhoto)p.bolPhoto='[BOL photo on tablet]';
-  if(p.signature)p.signature='[Signature captured on tablet]';
+  // signature sent as-is (Apps Script saves it to Google Drive)
   if(p.sealNumber==='[Photo]')p.sealNumber='[Seal photo on tablet]';
   if(p.driverName==='[See license photo]')p.driverName='[License photo on tablet]';
   if(p.licenseNumber==='[See license photo]')p.licenseNumber='[License photo on tablet]';
@@ -1354,7 +1394,17 @@ function submitForm(){
     licenseNumber:document.getElementById('licenseNumber').value.trim()||(licensePhotoData?'[See license photo]':''),
     licenseState:document.getElementById('licenseState').value||(licensePhotoData?'[See license photo]':''),
     licensePhoto:licensePhotoData||null,
-    signature:(sigHasContent&&sigCanvas)?sigCanvas.toDataURL('image/png'):null,
+    signature:(function(){
+      if(!sigHasContent||!sigCanvas)return null;
+      var c=document.createElement('canvas');
+      var maxW=300,ratio=Math.min(1,maxW/sigCanvas.width);
+      c.width=Math.round(sigCanvas.width*ratio);
+      c.height=Math.round(sigCanvas.height*ratio);
+      var ctx=c.getContext('2d');
+      ctx.fillStyle='#ffffff';ctx.fillRect(0,0,c.width,c.height);
+      ctx.drawImage(sigCanvas,0,0,c.width,c.height);
+      return c.toDataURL('image/jpeg',0.5);
+    })(),
     synced:false
   };
   var log=getLog();log.unshift(entry);saveLog(log);
@@ -1401,7 +1451,7 @@ function showSuccess(entry,synced){
     document.getElementById('sSync').textContent='\ud83d\udcbe Saved locally on this device';
     document.getElementById('sSync').style.color='#6b7280';
   }
-  var count=60;
+  var count=120;
   document.getElementById('countNum').textContent=count;
   if(countdownTimer)clearInterval(countdownTimer);
   countdownTimer=setInterval(function(){
