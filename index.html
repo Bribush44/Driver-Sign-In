@@ -931,6 +931,7 @@ header{background:#292929;border-bottom:3px solid var(--red);padding:13px 20px;
       <li>Type: <strong>Web app</strong> &bull; Execute as: <strong>Me</strong> &bull; Access: <strong>Anyone</strong>. Click <strong>Deploy</strong>.</li>
       <li>Authorize the script when prompted (no special permissions needed).</li>
       <li>Copy the <strong>Web app URL</strong> and paste it above.</li>
+      <li><strong>To format your existing data:</strong> In the editor, change the function dropdown to <strong>reformatSheet</strong> and click <strong>&#9654; Run</strong>. This applies column widths, colors, and row heights to all existing rows.</li>
     </ol>
     <div class="info-box">&#128274; &ldquo;Anyone&rdquo; only means the tablet can post data &mdash; the spreadsheet stays private to you.</div>
     <p style="font-size:12px;font-weight:700;color:#374151;margin-bottom:9px">Paste into Apps Script editor:</p>
@@ -942,19 +943,25 @@ header{background:#292929;border-bottom:3px solid var(--red);padding:13px 20px;
       sheet.appendRow(['Timestamp','Driver Name','Carrier','Seal Match BOL',
         'Seal Number','PO / Sales Order #','BOL Photo','Temp Controlled',
         'Trailer Temp Photo','License / Employee #','License State','Signature']);
-      sheet.getRange(1,1,1,12).setFontWeight('bold');
+      setupSheetFormatting(sheet);
     }
-    // Add the data row (signature column empty for now)
     sheet.appendRow([data.timestamp,data.driverName,data.carrier,data.sealMatch,
       data.sealNumber,data.poNumber||'',data.bolPhoto||'',data.tempControlled||'',
       data.trailerTempPhoto||'',data.licenseNumber,data.licenseState,'']);
     var newRow = sheet.getLastRow();
-    // Insert signature as an image directly in the sheet (no Drive needed)
+    sheet.setRowHeight(newRow, 80);
+    var rowRange = sheet.getRange(newRow, 1, 1, 12);
+    rowRange.setVerticalAlignment('middle');
+    rowRange.setFontSize(10);
+    rowRange.setWrap(true);
+    if (newRow % 2 === 0) { rowRange.setBackground('#fffde7'); }
+    sheet.getRange(newRow, 4).setHorizontalAlignment('center');
+    sheet.getRange(newRow, 8).setHorizontalAlignment('center');
+    sheet.getRange(newRow, 11).setHorizontalAlignment('center');
     if (data.signature &amp;&amp; data.signature.indexOf('data:image') === 0) {
       try {
         var b64 = data.signature.split(',')[1];
         var blob = Utilities.newBlob(Utilities.base64Decode(b64), 'image/jpeg', 'sig.jpg');
-        sheet.setRowHeight(newRow, 80);
         sheet.insertImage(blob, 12, newRow);
       } catch(sigErr) {
         sheet.getRange(newRow, 12).setValue('[Sig error: ' + sigErr.message + ']');
@@ -965,6 +972,49 @@ header{background:#292929;border-bottom:3px solid var(--red);padding:13px 20px;
   } catch(err) {
     return ContentService.createTextOutput(JSON.stringify({status:'error',message:err.toString()}))
       .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function setupSheetFormatting(sheet) {
+  sheet.setFrozenRows(1);
+  sheet.setColumnWidth(1, 160);   // Timestamp
+  sheet.setColumnWidth(2, 150);   // Driver Name
+  sheet.setColumnWidth(3, 140);   // Carrier
+  sheet.setColumnWidth(4, 95);    // Seal Match BOL
+  sheet.setColumnWidth(5, 110);   // Seal Number
+  sheet.setColumnWidth(6, 135);   // PO / Sales Order #
+  sheet.setColumnWidth(7, 120);   // BOL Photo
+  sheet.setColumnWidth(8, 95);    // Temp Controlled
+  sheet.setColumnWidth(9, 130);   // Trailer Temp Photo
+  sheet.setColumnWidth(10, 135);  // License / Employee #
+  sheet.setColumnWidth(11, 80);   // License State
+  sheet.setColumnWidth(12, 160);  // Signature
+  var h = sheet.getRange(1, 1, 1, 12);
+  h.setBackground('#1e3a5f');
+  h.setFontColor('#ffffff');
+  h.setFontWeight('bold');
+  h.setFontSize(11);
+  h.setVerticalAlignment('middle');
+  h.setHorizontalAlignment('center');
+  h.setWrap(true);
+  sheet.setRowHeight(1, 42);
+}
+
+// Run this from the editor to reformat your existing sheet data
+function reformatSheet() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  setupSheetFormatting(sheet);
+  var lastRow = sheet.getLastRow();
+  for (var i = 2; i &lt;= lastRow; i++) {
+    var r = sheet.getRange(i, 1, 1, 12);
+    r.setVerticalAlignment('middle');
+    r.setFontSize(10);
+    r.setWrap(true);
+    if (i % 2 === 0) { r.setBackground('#fffde7'); }
+    sheet.setRowHeight(i, 80);
+    sheet.getRange(i, 4).setHorizontalAlignment('center');
+    sheet.getRange(i, 8).setHorizontalAlignment('center');
+    sheet.getRange(i, 11).setHorizontalAlignment('center');
   }
 }
 
