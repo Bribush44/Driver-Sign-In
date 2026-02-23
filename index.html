@@ -926,15 +926,21 @@ header{background:#292929;border-bottom:3px solid var(--red);padding:13px 20px;
     <ol class="step-list">
       <li>Go to <strong>sheets.google.com</strong> and create a new blank spreadsheet.</li>
       <li>Click <strong>Extensions &rarr; Apps Script</strong>.</li>
-      <li>Delete existing code and paste the script below.</li>
-      <li>Click <strong>Save</strong>, then <strong>Deploy &rarr; New deployment</strong>.</li>
+      <li>Delete existing code and paste the script below. Click <strong>Save</strong>.</li>
+      <li><strong style="color:#dc2626">IMPORTANT &mdash; Authorize Drive access first:</strong> At the top of the editor, change the function dropdown to <strong>authorizeNow</strong>, then click the <strong>&#9654; Run</strong> button. A popup will ask for Google permissions &mdash; click <strong>Allow</strong>. You only do this once.</li>
+      <li>Now click <strong>Deploy &rarr; New deployment</strong>.</li>
       <li>Type: <strong>Web app</strong> &bull; Execute as: <strong>Me</strong> &bull; Access: <strong>Anyone</strong>. Click <strong>Deploy</strong>.</li>
-      <li>Authorize the script when prompted.</li>
       <li>Copy the <strong>Web app URL</strong> and paste it above.</li>
     </ol>
     <div class="info-box">&#128274; &ldquo;Anyone&rdquo; only means the tablet can post data &mdash; the spreadsheet stays private to you.</div>
     <p style="font-size:12px;font-weight:700;color:#374151;margin-bottom:9px">Paste into Apps Script editor:</p>
-    <div class="code-block">function doPost(e) {
+    <div class="code-block">// Run this ONCE from the editor (▶ button) to grant Drive permission
+function authorizeNow() {
+  DriveApp.getRootFolder();
+  SpreadsheetApp.getActiveSpreadsheet();
+}
+
+function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
