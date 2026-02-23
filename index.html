@@ -944,27 +944,26 @@ header{background:#292929;border-bottom:3px solid var(--red);padding:13px 20px;
         'Trailer Temp Photo','License / Employee #','License State','Signature']);
       sheet.getRange(1,1,1,12).setFontWeight('bold');
     }
-    // Save signature to hidden Signatures sheet and store a view link
-    var sigValue = '';
-    if (data.signature && data.signature.indexOf('data:image') === 0) {
-      try {
-        var ss = SpreadsheetApp.getActiveSpreadsheet();
-        var sigSheet = ss.getSheetByName('Signatures');
-        if (!sigSheet) {
-          sigSheet = ss.insertSheet('Signatures');
-          sigSheet.hideSheet();
-          sigSheet.appendRow(['Timestamp','Driver','Signature']);
-        }
-        sigSheet.appendRow([data.timestamp, data.driverName||'', data.signature]);
-        var scriptUrl = ScriptApp.getService().getUrl();
-        sigValue = scriptUrl + '?view_sig=' + encodeURIComponent(data.timestamp);
-      } catch(sigErr) {
-        sigValue = '[Signature error: ' + sigErr.message + ']';
-      }
-    }
+    // Add the data row first (signature cell left empty, filled below)
     sheet.appendRow([data.timestamp,data.driverName,data.carrier,data.sealMatch,
       data.sealNumber,data.poNumber||'',data.bolPhoto||'',data.tempControlled||'',
-      data.trailerTempPhoto||'',data.licenseNumber,data.licenseState,sigValue]);
+      data.trailerTempPhoto||'',data.licenseNumber,data.licenseState,'']);
+    var newRow = sheet.getLastRow();
+    // Upload signature image to Drive and embed it directly in the cell
+    if (data.signature &amp;&amp; data.signature.indexOf('data:image') === 0) {
+      try {
+        var b64 = data.signature.split(',')[1];
+        var blob = Utilities.newBlob(Utilities.base64Decode(b64), 'image/jpeg',
+          'sig_' + (data.timestamp || Date.now()) + '.jpg');
+        var file = DriveApp.createFile(blob);
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        var imgUrl = 'https://drive.google.com/uc?export=view&amp;id=' + file.getId();
+        var cellImg = SpreadsheetApp.newCellImage().setSourceUrl(imgUrl).build();
+        sheet.getRange(newRow, 12).setValue(cellImg);
+      } catch(sigErr) {
+        sheet.getRange(newRow, 12).setValue('[Sig error: ' + sigErr.message + ']');
+      }
+    }
     return ContentService.createTextOutput(JSON.stringify({status:'ok'}))
       .setMimeType(ContentService.MimeType.JSON);
   } catch(err) {
@@ -976,34 +975,6 @@ header{background:#292929;border-bottom:3px solid var(--red);padding:13px 20px;
 function doGet(e) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    // View a signature by timestamp
-    if (e.parameter.view_sig) {
-      var ts = decodeURIComponent(e.parameter.view_sig);
-      var sigSheet = ss.getSheetByName('Signatures');
-      if (sigSheet) {
-        var rows = sigSheet.getDataRange().getValues();
-        for (var i = 1; i &lt; rows.length; i++) {
-          if (String(rows[i][0]) === ts) {
-            var html = '&lt;!DOCTYPE html&gt;&lt;html&gt;&lt;head&gt;&lt;title&gt;Driver Signature&lt;/title&gt;'
-              + '&lt;style&gt;body{margin:0;background:#f1f1e8;display:flex;align-items:center;'
-              + 'justify-content:center;min-height:100vh;font-family:sans-serif;}'
-              + '.box{background:#fff;padding:28px;border-radius:16px;'
-              + 'box-shadow:0 4px 24px rgba(0,0,0,.15);text-align:center;max-width:480px;width:90%;}'
-              + 'h3{margin:0 0 4px;font-size:18px;color:#1a1a1a}'
-              + 'p{color:#6b7280;font-size:13px;margin:0 0 16px}'
-              + 'img{max-width:100%;border:1px solid #e2e2d9;border-radius:8px}'
-              + '&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class="box"&gt;'
-              + '&lt;h3&gt;Driver Signature&lt;/h3&gt;'
-              + '&lt;p&gt;' + (rows[i][1]||'Driver') + ' &amp;mdash; ' + ts + '&lt;/p&gt;'
-              + '&lt;img src="' + rows[i][2] + '"&gt;'
-              + '&lt;/div&gt;&lt;/body&gt;&lt;/html&gt;';
-            return HtmlService.createHtmlOutput(html);
-          }
-        }
-      }
-      return HtmlService.createHtmlOutput('&lt;p&gt;Signature not found.&lt;/p&gt;');
-    }
-    // Default: return sheet info
     var sheet = ss.getActiveSheet();
     return ContentService.createTextOutput(JSON.stringify({
       status:'ok',
