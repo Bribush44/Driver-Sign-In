@@ -1000,9 +1000,19 @@ function setupSheetFormatting(sheet) {
   sheet.setRowHeight(1, 42);
 }
 
-// Run this from the editor to reformat your existing sheet data
+// Run this from the editor to add headers + reformat all existing data
 function reformatSheet() {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var headers = ['Timestamp','Driver Name','Carrier','Seal Match BOL',
+    'Seal Number','PO / Sales Order #','BOL Photo','Temp Controlled',
+    'Trailer Temp Photo','License / Employee #','License State','Signature'];
+  // Insert header row at top if it is missing
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(headers);
+  } else if (sheet.getRange(1,1).getValue() !== 'Timestamp') {
+    sheet.insertRowBefore(1);
+    sheet.getRange(1, 1, 1, 12).setValues([headers]);
+  }
   setupSheetFormatting(sheet);
   var lastRow = sheet.getLastRow();
   for (var i = 2; i &lt;= lastRow; i++) {
